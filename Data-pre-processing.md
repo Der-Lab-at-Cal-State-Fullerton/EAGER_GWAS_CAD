@@ -1,11 +1,12 @@
 # Data pre-processing
 
-For this tutorial we use genotype data files formatted for use with [PLINK](http://pngu.mgh.harvard.edu/~purcell/plink/") software. We utilize the function, `read.plink` from snpStats, which allows the reading in of data formatted as .bed, .bim, and .fam files. The .bed file contains the genotype information, coded in binary. The .bim file contains information for each SNP with a respective column for each of the following information: chromosome number, SNP name (typically an rs #), genetic distance (not necessary for this tutorial), chromosomal position, identity of allele 1, and identity of allele 2. The assignment of allele 1 and allele 2, is related to the effect allele, or the allele that is being counted when we assign a numeric value to a genotype. This is typically assigned based on allele frequency, though not always. In this tutorial, allele 1 pertains to the minor, or less common allele. Lastly, the .fam file contains information for each samples with a respective column for each of the following information: family ID (this will be used to identify each sample when read into R), individual ID, paternal ID, maternal ID, sex (coded as 1 = male, 2 = female), and phenotype. In this tutorial we utilize a supplemental clinical file for outcome variables and additional covariates.
+For this tutorial we use genotype data files formatted for use with [PLINK](http://pngu.mgh.harvard.edu/~purcell/plink/%22) software. We utilize the function, `read.plink` from snpStats, which allows the reading in of data formatted as .bed, .bim, and .fam files. The .bed file contains the genotype information, coded in binary. The .bim file contains information for each SNP with a respective column for each of the following information: chromosome number, SNP name (typically an rs \#), genetic distance (not necessary for this tutorial), chromosomal position, identity of allele 1, and identity of allele 2. The assignment of allele 1 and allele 2, is related to the effect allele, or the allele that is being counted when we assign a numeric value to a genotype. This is typically assigned based on allele frequency, though not always. In this tutorial, allele 1 pertains to the minor, or less common allele. Lastly, the .fam file contains information for each samples with a respective column for each of the following information: family ID (this will be used to identify each sample when read into R), individual ID, paternal ID, maternal ID, sex (coded as 1 = male, 2 = female), and phenotype. In this tutorial we utilize a supplemental clinical file for outcome variables and additional covariates.
 
 Alternatively, similar genotype information can also be formatted for PLINK software as .ped and .map files. The information of the .ped file can be thought of as a combination of the .bed and .fam files. It is a large table with the first six columns identical to a .fam file, followed by a columns containing the genotype data for each SNP. The .map file contains the first four columns of the .bim file, without the allele assignments. These files can be read in using the function, `read.pedfile`, from snpStats. More information about the formatting of these files can be found on the PLINK website.
 
 ## Read in PLINK files - Step1
-```r
+
+``` r
 library(snpStats)
 
 # Read in PLINK files
@@ -16,20 +17,21 @@ geno <- read.plink(gwas.fn$bed, gwas.fn$bim, gwas.fn$fam, na.strings = ("-9"))
 genotype <- geno$genotype
 print(genotype)                  # 861473 SNPs read in for 1401 subjects
 ```
-```
+
+```         
 ## A SnpMatrix with  1401 rows and  861473 columns
 ## Row names:  10002 ... 11596 
 ## Col names:  rs10458597 ... rs5970564
 ```
 
-```r
+``` r
 #Obtain the SNP information from geno list
 genoBim <- geno$map
 colnames(genoBim) <- c("chr", "SNP", "gen.dist", "position", "A1", "A2")
 print(head(genoBim))
 ```
 
-```
+```         
 ##            chr        SNP gen.dist position   A1 A2
 ## rs10458597   1 rs10458597        0   564621 <NA>  C
 ## rs12565286   1 rs12565286        0   721290    G  C
@@ -38,20 +40,23 @@ print(head(genoBim))
 ## rs2286139    1  rs2286139        0   761732    C  T
 ## rs11240776   1 rs11240776        0   765269    G  A
 ```
-```r
+
+``` r
 # Remove raw file to free up memory
 rm(geno)
 ```
+
 Supplemental clinical data is found in a corresponding CSV file for each sample. It contains a column for the sample ID (Family ID in the .fam file) and a respective column for each of the following variables: coronary artery disease status (coded as 0 = control and 1 = affected), sex (coded as 1 = male, 2 = female), age (years), triglyceride level (mg/dL), high-density lipoprotein level (mg/dL), low-density lipoprotein level (mg/dL).
 
-```r
+``` r
 # Read in clinical file
 clinical <- read.csv(clinical.fn,
                      colClasses=c("character", "factor", "factor", rep("numeric", 4)))
 rownames(clinical) <- clinical$FamID
 print(head(clinical))
 ```
-```
+
+```         
 ##       FamID CAD sex age  tg hdl ldl
 ## 10002 10002   1   1  60  NA  NA  NA
 ## 10004 10004   1   2  50  55  23  75
@@ -60,28 +65,32 @@ print(head(clinical))
 ## 10008 10008   1   1  58 161  40  94
 ## 10009 10009   1   1  59 171  46  92
 ```
+
 We filter the genotype data to only include samples with corresponding clinical data by indexing the genotype object using only row names that match the sample IDs.
 
-```r
+``` r
 # Subset genotype for subject data
 genotype <- genotype[clinical$FamID, ]
 print(genotype)  # Tutorial: All 1401 subjects contain both clinical and genotype data
 ```
-```
+
+```         
 ## A SnpMatrix with  1401 rows and  861473 columns
 ## Row names:  10002 ... 11596 
 ## Col names:  rs10458597 ... rs5970564
 ```
 
 ## SNP level filtering - Step 2
+
 Once the data is loaded, we are ready to remove SNPs that fail to meet minimum criteria due to missing data, low variability or genotyping errors. snpStats provides functions, col.summary and row.summary, that return statistics on SNPs and samples, respectively.
 
-```r
+``` r
 # Create SNP summary statistics (MAF, call rate, etc.)
 snpsum.col <- col.summary(genotype)
 print(head(snpsum.col))
 ```
-```
+
+```         
 ##            Calls Call.rate Certain.calls       RAF         MAF       P.AA
 ## rs10458597  1398 0.9978587             1 1.0000000 0.000000000 0.00000000
 ## rs12565286  1384 0.9878658             1 0.9483382 0.051661850 0.00433526
@@ -97,9 +106,10 @@ print(head(snpsum.col))
 ## rs2286139  0.231671554 0.7463343 -0.93146122
 ## rs11240776 0.002364066 0.9976359  0.04215743
 ```
+
 Using these summary statistics, we keep the subset of SNPs that meet our criteria for minimum call rate and minor allele frequency.
 
-```r
+``` r
 # Setting thresholds
 call <- 0.95
 minor <- 0.01
@@ -111,33 +121,39 @@ use[is.na(use)] <- FALSE                # Remove NA's as well
 cat(ncol(genotype)-sum(use),
 "SNPs will be removed due to low MAF or call rate.\n") #203287 SNPs will be removed
 ```
-```
+
+```         
 ## 203287 SNPs will be removed due to low MAF or call rate.
 ```
-```r
+
+``` r
 # Subset genotype and SNP summary data for SNPs that pass call rate and MAF criteria
 genotype <- genotype[,use]
 snpsum.col <- snpsum.col[use,]
 
 print(genotype)                           # 658186 SNPs remain
 ```
-```
+
+```         
 ## A SnpMatrix with  1401 rows and  658186 columns
 ## Row names:  10002 ... 11596 
 ## Col names:  rs12565286 ... rs5970564
 ```
-```r
+
+``` r
 # Write subsetted genotype data and derived results for future use
 save(genotype, snpsum.col, genoBim, clinical, file=working.data.fname(2))
 ```
 
 ## Sample level filtering - Step 3
+
 The second stage of data pre-processing involves filtering samples, i.e. removing individuals due to missing data, sample contamination, correlation (for population-based investigations), and racial/ethnic or gender ambiguity or discordance. In our study, we address these issues by filtering on call rate, heterozygosity, cryptic relatedness and duplicates using identity-by-descent, and we visually assess ancestry.
 
 ### Basic sample filtering
-Sample level quality control for missing data and heterozygosity is achieved using the row.summary function from snpStats. An additional heterozygosity F statistic calculation is carried out with the form, |F|=(1−O/E), where O is observed proportion of heterozygous genotypes for a given sample and E is the expected proportion of heterozygous genotypes for a given sample based on the minor allele frequency across all non-missing SNPs for a given sample.
 
-```r
+Sample level quality control for missing data and heterozygosity is achieved using the row.summary function from snpStats. An additional heterozygosity F statistic calculation is carried out with the form, \|F\|=(1−O/E), where O is observed proportion of heterozygous genotypes for a given sample and E is the expected proportion of heterozygous genotypes for a given sample based on the minor allele frequency across all non-missing SNPs for a given sample.
+
+``` r
 # Sample level filtering
 source("https://github.com/AAlhendi1707/GWAS/blob/master/R/globals.R?raw=true")
 
@@ -160,7 +176,8 @@ snpsum.row$hetF <- 1-(hetObs/hetExp)
 
 head(snpsum.row)
 ```
-```
+
+```         
 ##       Call.rate Certain.calls Heterozygosity          hetF
 ## 10002 0.9826554             1      0.3289825 -0.0247708291
 ## 10004 0.9891581             1      0.3242931 -0.0103236529
@@ -172,7 +189,7 @@ head(snpsum.row)
 
 We apply filtering on call rate and heterozygosity, selecting only those samples that meet our criteria.
 
-```r
+``` r
 # Setting thresholds
 sampcall <- 0.95    # Sample call rate cut-off
 hetcutoff <- 0.1    # Inbreeding coefficient cut-off
@@ -182,18 +199,22 @@ sampleuse[is.na(sampleuse)] <- FALSE    # remove NA's as well
 cat(nrow(genotype)-sum(sampleuse), 
 "subjects will be removed due to low sample call rate or inbreeding coefficient.\n") #0 subjects removed
 ```
-```
+
+```         
 ## 0 subjects will be removed due to low sample call rate or inbreeding coefficient.
 ```
-```r
+
+``` r
 # Subset genotype and clinical data for subjects who pass call rate and heterozygosity crtieria
 genotype <- genotype[sampleuse,]
 clinical<- clinical[ rownames(genotype), ]
 ```
+
 ### IBD analysis
+
 In addition to these summary statistics, we also want to filter on relatedness criteria. We use the SNPRelate package to perform identity-by-descent (IBD) analysis. This package requires that the data be transformed into a GDS format file. IBD analysis is performed on only a subset of SNPs that are in linkage equilibrium by iteratively removing adjacent SNPs that exceed an LD threshold in a sliding window using the `snpgdsLDpruning` function.
 
-```r
+``` r
 # Checking for Relatedness
 
 ld.thresh <- 0.2    # LD cut-off
@@ -202,16 +223,17 @@ kin.thresh <- 0.1   # Kinship cut-off
 # Create gds file, required for SNPRelate functions
 snpgdsBED2GDS(gwas.fn$bed, gwas.fn$fam, gwas.fn$bim, gwas.fn$gds)
 ```
-```
+
+```         
 Start snpgdsBED2GDS ...
-	BED file: "/scratch/spectre/a/asna4/GWAS/GWAStutorial.bed" in the SNP-major mode (Sample X SNP)
-	FAM file: "/scratch/spectre/a/asna4/GWAS/GWAStutorial.fam", DONE.
-	BIM file: "/scratch/spectre/a/asna4/GWAS/GWAStutorial.bim", DONE.
-Thu Apr 11 19:57:17 2019 	store sample id, snp id, position, and chromosome.
-	start writing: 1401 samples, 861473 SNPs ...
- 	Thu Apr 11 19:57:17 2019	0%
- 	Thu Apr 11 19:57:29 2019	100%
-Thu Apr 11 19:57:29 2019 	Done.
+    BED file: "/scratch/spectre/a/asna4/GWAS/GWAStutorial.bed" in the SNP-major mode (Sample X SNP)
+    FAM file: "/scratch/spectre/a/asna4/GWAS/GWAStutorial.fam", DONE.
+    BIM file: "/scratch/spectre/a/asna4/GWAS/GWAStutorial.bim", DONE.
+Thu Apr 11 19:57:17 2019    store sample id, snp id, position, and chromosome.
+    start writing: 1401 samples, 861473 SNPs ...
+    Thu Apr 11 19:57:17 2019    0%
+    Thu Apr 11 19:57:29 2019    100%
+Thu Apr 11 19:57:29 2019    Done.
 Optimize the access efficiency ...
 Clean up the fragments of GDS file:
     open the file '/scratch/spectre/a/asna4/GWAS/GWAStutorial.gds' (292.4M)
@@ -220,7 +242,8 @@ Clean up the fragments of GDS file:
     rename '/scratch/spectre/a/asna4/GWAS/GWAStutorial.gds.tmp' (292.4M, reduced: 252B)
     # of fragments: 18
 ```
-```r
+
+``` r
 genofile <- openfn.gds(gwas.fn$gds, readonly = FALSE)
 
 # Automatically added "-1" sample suffixes are removed
@@ -234,12 +257,13 @@ geno.sample.ids <- rownames(genotype)
 snpSUB <- snpgdsLDpruning(genofile, ld.threshold = ld.thresh,
                           sample.id = geno.sample.ids, # Only analyze the filtered samples
                           snp.id = colnames(genotype)) # Only analyze the filtered SNPs
+```
 
-```
-```
+```         
 ## Hint: it is suggested to call `snpgdsOpen' to open a SNP GDS file instead of `openfn.gds'.
 ```
-```
+
+```         
 ## SNP pruning based on LD:
 ## Excluding 203287 SNPs on non-autosomes
 ## Excluding 0 SNP (monomorphic: TRUE, < MAF: NaN, or > missing rate: NaN)
@@ -271,27 +295,31 @@ snpSUB <- snpgdsLDpruning(genofile, ld.threshold = ld.thresh,
 ## Chromosome 22: 10.96%, 1248/11382
 ## 72812 SNPs are selected in total.
 ```
-```r
+
+``` r
 snpset.ibd <- unlist(snpSUB, use.names=FALSE)
 cat(length(snpset.ibd),"will be used in IBD analysis\n")  # Tutorial: expect 72812 SNPs
 ```
-```
+
+```         
 ## 72812 will be used in IBD analysis
 ```
+
 The `snpgdsIBDMoM` function computes the IBD coefficients using method of moments. The result is a table indicating kinship among pairs of samples.
 
-```r
+``` r
 # Find IBD coefficients using Method of Moments procedure.  Include pairwise kinship.
 ibd <- snpgdsIBDMoM(genofile, kinship=TRUE,
                     sample.id = geno.sample.ids,
                     snp.id = snpset.ibd,
                     num.thread = 1)
+```
 
-```
-```
+```         
 ## Hint: it is suggested to call `snpgdsOpen' to open a SNP GDS file instead of `openfn.gds'.
 ```
-```
+
+```         
 IBD analysis (PLINK method of moment) on genotypes:
 Excluding 788,661 SNPs (non-autosomes or non-selection)
 Excluding 0 SNP (monomorphic: TRUE, MAF: NaN, missing rate: NaN)
@@ -302,11 +330,13 @@ Thu Apr 11 20:01:28 2019    (internal increment: 65536)
 [==================================================] 100%, completed in 13s
 Thu Apr 11 20:01:41 2019    Done.
 ```
-```r
+
+``` r
 ibdcoeff <- snpgdsIBDSelection(ibd)     # Pairwise sample comparison
 head(ibdcoeff)
 ```
-```
+
+```         
 ##     ID1   ID2        k0         k1    kinship
 ## 1 10002 10004 0.9201072 0.07989281 0.01997320
 ## 2 10002 10005 0.9478000 0.05220002 0.01305001
@@ -318,7 +348,7 @@ head(ibdcoeff)
 
 Using the IBD pairwise sample relatedness measure, we iteratively remove samples that are too similar using a greedy strategy in which the sample with the largest number of related samples is removed. The process is repeated until there are no more pairs of samples with kinship coefficients above our cut-off.
 
-```r
+``` r
 # Check if there are any candidates for relatedness
 ibdcoeff <- ibdcoeff[ ibdcoeff$kinship >= kin.thresh, ]
 
@@ -346,32 +376,37 @@ geno.sample.ids <- rownames(genotype)
 cat(length(related.samples), 
 "similar samples removed due to correlation coefficient >=", kin.thresh,"\n") 
 ```
-```
+
+```         
 ## 0 similar samples removed due to correlation coefficient >= 0.1
 ```
-```r
+
+``` r
 print(genotype)                         # Tutorial: expect all 1401 subjects remain
 ```
-```
+
+```         
 ## A SnpMatrix with  1401 rows and  658186 columns
 ## Row names:  10002 ... 11596 
 ## Col names:  rs12565286 ... rs5970564
 ```
 
 ### Ancestry
+
 To better understand ancestry, we plot the first two principal components of the genotype data. Principal component calculation is achieved via the `snpgdsPCA` function from SNPRelate. It is important to note that in this example we are reasonably confident that our samples are homogeneous, coming from european ancestry. Therefore, given that there are no clear outliers, we fail to remove any samples.
 
-```r
+``` r
 # Checking for ancestry
 
 # Find PCA matrix
 pca <- snpgdsPCA(genofile, sample.id = geno.sample.ids,  snp.id = snpset.ibd, num.thread=1)
 ```
-```
+
+```         
 ## Hint: it is suggested to call `snpgdsOpen' to open a SNP GDS file instead of `openfn.gds'.
 ```
 
-```
+```         
 Principal Component Analysis (PCA) on genotypes:
 Excluding 788,661 SNPs (non-autosomes or non-selection)
 Excluding 0 SNP (monomorphic: TRUE, MAF: NaN, missing rate: NaN)
@@ -384,7 +419,8 @@ Thu Apr 11 20:05:42 2019    (internal increment: 3248)
 Thu Apr 11 20:06:24 2019    Begin (eigenvalues and eigenvectors)
 Thu Apr 11 20:06:25 2019    Done.
 ```
-```r
+
+``` r
 # Create data frame of first two principal comonents
 pctab <- data.frame(sample.id = pca$sample.id,
                     PC1 = pca$eigenvect[,1],    # the first eigenvector
@@ -395,9 +431,10 @@ pctab <- data.frame(sample.id = pca$sample.id,
 plot(pctab$PC2, pctab$PC1, xlab="Principal Component 2", ylab="Principal Component 1", 
 main = "Ancestry Plot")
 ```
-<img src="imgs/PCA-plot.png" width=50% height=50% >
 
-```r
+<img src="imgs/PCA-plot.png" width="50%" height="50%"/>
+
+``` r
 # Close GDS file
 closefn.gds(genofile)
 
@@ -406,9 +443,10 @@ save(genotype, genoBim, clinical, file=working.data.fname(3))
 ```
 
 ## SNP Filtering - HWE filtering on control samples - Step 4
+
 Finally, once samples are filtered, we return to SNP level filtering and apply a check of Hardy-Weinberg equilibrium. Rejection of Hardy-Weinberg equilibrium can be an indication of population substructure or genotyping errors. Given that we are performing a statistical test at every SNP, it is common to use a relatively lenient cut-off. In this example we only remove SNPs with p-values, corresponding to the HWE test statistic on CAD controls, of less than 1×10−6. We only test HWE on CAD controls due to possible violation of HWE caused by disease association.
 
-```r
+``` r
 # Hardy-Weinberg SNP filtering on CAD controls
 
 hardy <- 10^-6      # HWE cut-off
@@ -421,20 +459,22 @@ rm(snpsum.colCont)
 HWEuse[is.na(HWEuse)] <- FALSE          # Remove NA's as well
 cat(ncol(genotype)-sum(HWEuse),"SNPs will be removed due to high HWE.\n")  # 1296 SNPs removed
 ```
-```
+
+```         
 ## 1296 SNPs will be removed due to high HWE.
 ```
-```r
+
+``` r
 # Subset genotype and SNP summary data for SNPs that pass HWE criteria
 genotype <- genotype[,HWEuse]
 
 print(genotype)                           # 656890 SNPs remain
 ```
-```
+
+```         
 ## A SnpMatrix with  1401 rows and  656890 columns
 ## Row names:  10002 ... 11596 
 ## Col names:  rs12565286 ... rs28729663
 ```
-```r
-# Save genotype and SNVs filtered data to use in later analyses
-save(genotype, genoBim, clinical, file=working.data.fname(4))
+
+\`\`\`r \# Save genotype and SNVs filtered data to use in later analyses save(genotype, genoBim, clinical, file=working.data.fname(4))
